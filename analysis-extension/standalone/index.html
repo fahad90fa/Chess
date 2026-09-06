@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Local Stockfish Analysis</title>
+  <style>
+    :root { --light:#ebecd0; --dark:#739552; --bg:#312e2b; --panel:#262421; --fg:#e8e6e3; --accent:#7fa650; --muted:#9a978f; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif; }
+    header { padding:12px 18px; background:var(--panel); display:flex; align-items:center; gap:10px; }
+    header h1 { font-size:16px; margin:0; font-weight:600; }
+    header .tag { font-size:11px; color:var(--muted); }
+    main { display:flex; gap:18px; padding:18px; flex-wrap:wrap; align-items:flex-start; }
+    .board-col { width:min(90vw, 440px); }
+    #board { display:grid; grid-template-columns:repeat(8,1fr); width:100%; aspect-ratio:1/1;
+             border:2px solid #000; border-radius:4px; overflow:hidden; }
+    .sq { display:flex; align-items:center; justify-content:center; font-size:min(7vw,34px); line-height:1;
+          aspect-ratio:1/1; cursor:pointer; position:relative; user-select:none; }
+    .sq.wpiece { color:#fff; text-shadow:0 1px 2px #000; }
+    .sq.bpiece { color:#111; }
+    .sq.sel { outline:3px solid var(--accent); outline-offset:-3px; }
+    .sq.target::after { content:""; position:absolute; width:28%; height:28%; border-radius:50%;
+          background:rgba(20,120,20,0.55); }
+    .sq.tcap::after { content:""; position:absolute; inset:6%; border:4px solid rgba(20,120,20,0.55); border-radius:50%; }
+    .sq.best { box-shadow: inset 0 0 0 4px rgba(255,196,0,0.85); }
+    .panel { background:var(--panel); border-radius:10px; padding:14px; width:min(92vw,360px); }
+    .evalrow { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .evalbar { position:relative; flex:1; height:16px; background:#111; border-radius:8px; overflow:hidden; }
+    .evalbar > div { position:absolute; left:0; top:0; bottom:0; width:50%; background:#f5f5f5; transition:width .2s; }
+    .evalnum { min-width:56px; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+    .best { font-size:18px; font-weight:800; color:var(--accent); }
+    .pv { font-size:13px; color:#c9c6c0; background:#1e1c1a; border-radius:6px; padding:8px; min-height:44px;
+          margin:10px 0; word-break:break-word; user-select:text; }
+    label { font-size:12px; color:var(--muted); display:block; margin:10px 0 4px; }
+    input[type=text], textarea { width:100%; background:#1e1c1a; color:var(--fg); border:1px solid #444;
+          border-radius:6px; padding:8px; font:12px/1.4 monospace; }
+    textarea { height:80px; resize:vertical; }
+    .btnrow { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    button { cursor:pointer; border:none; border-radius:6px; padding:8px 10px; font-weight:600; font-size:13px; }
+    button.primary { background:var(--accent); color:#12240a; }
+    button.ghost { background:#3a3835; color:var(--fg); border:1px solid #4a4844; }
+    .nav button { min-width:40px; }
+    .status { margin-top:10px; font-size:12px; color:var(--muted); min-height:16px; }
+    .movelist { max-height:150px; overflow:auto; font-size:13px; background:#1e1c1a; border-radius:6px; padding:8px;
+          margin-top:10px; user-select:text; }
+    .movelist .m { cursor:pointer; padding:1px 4px; border-radius:3px; }
+    .movelist .m.cur { background:var(--accent); color:#12240a; }
+    .note { margin-top:12px; font-size:11px; color:#6c6a63; line-height:1.4; }
+    select { background:#1e1c1a; color:var(--fg); border:1px solid #444; border-radius:6px; padding:4px; }
+    .row { display:flex; align-items:center; gap:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>♞ Local Stockfish Analysis</h1>
+    <span class="tag">Stockfish 17.1 · WASM · runs locally, no network</span>
+  </header>
+  <main>
+    <div class="board-col">
+      <div id="board"></div>
+      <div class="btnrow">
+        <button class="ghost" id="startBtn">Start position</button>
+        <button class="ghost" id="flipBtn">Flip</button>
+        <button class="ghost" id="clearBtn">Analyze current</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="evalrow">
+        <div class="evalbar"><div id="evalWhite"></div></div>
+        <div class="evalnum" id="evalNum">0.00</div>
+      </div>
+      <div class="row" style="justify-content:space-between;">
+        <div class="best" id="bestMove">Best: —</div>
+        <div style="color:var(--muted)" id="depth">d —</div>
+      </div>
+      <div class="pv" id="pv">Principal variation will appear here.</div>
+
+      <div class="nav btnrow">
+        <button class="ghost" id="firstBtn">⏮</button>
+        <button class="ghost" id="prevBtn">◀</button>
+        <button class="ghost" id="nextBtn">▶</button>
+        <button class="ghost" id="lastBtn">⏭</button>
+        <div class="row" style="margin-left:auto;">
+          <label style="margin:0;">Depth</label>
+          <select id="depthSel">
+            <option>12</option><option>15</option><option selected>18</option>
+            <option>20</option><option>22</option><option>25</option>
+          </select>
+        </div>
+      </div>
+
+      <label for="fenIn">FEN</label>
+      <input type="text" id="fenIn" placeholder="Paste FEN and press Enter" />
+
+      <label for="pgnIn">PGN</label>
+      <textarea id="pgnIn" placeholder="Paste PGN, then click Load PGN"></textarea>
+      <div class="btnrow">
+        <button class="primary" id="loadPgnBtn" style="flex:1;">Load PGN</button>
+      </div>
+
+      <div class="movelist" id="movelist"></div>
+      <div class="status" id="status">Loading engine…</div>
+      <div class="note">
+        Educational analysis tool. Use it on positions you are studying, your own finished games,
+        or the chess.com analysis board where engine help is allowed — not during live games against opponents.
+      </div>
+    </div>
+  </main>
+
+  <script src="../chesslib.js"></script>
+  <script src="../worker.js"></script>
+  <script src="standalone.js"></script>
+</body>
+</html>

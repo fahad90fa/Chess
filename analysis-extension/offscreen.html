@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Stockfish engine host</title>
+</head>
+<body>
+  <!-- Invisible host document. It exists only to own the engine Web Worker,
+       which cannot be created from a content script (page CSP) or a service
+       worker (no Worker support). -->
+  <script src="worker.js"></script>
+  <script src="offscreen.js"></script>
+</body>
+</html>
