@@ -1,0 +1,10 @@
+{
+  "name": "chess-analysis-extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Self-contained, no-build Chrome MV3 extension for local Stockfish analysis on the chess.com analysis board and a standalone page.",
+  "scripts": {
+    "test": "node test/perft.test.cjs"
+  }
+}
